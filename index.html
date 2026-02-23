@@ -1,0 +1,2393 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gravity Arena - Online PvP</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            overflow: hidden;
+            background: #000;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #fff;
+            cursor: none;
+        }
+
+        #gameCanvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        /* Crosshair */
+        #crosshair {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 100;
+            pointer-events: none;
+            display: none;
+        }
+
+        #crosshair .ch-dot {
+            width: 4px;
+            height: 4px;
+            background: #fff;
+            border-radius: 50%;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        #crosshair .ch-line {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.8);
+        }
+
+        #crosshair .ch-top {
+            width: 2px;
+            height: 12px;
+            top: -18px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        #crosshair .ch-bottom {
+            width: 2px;
+            height: 12px;
+            bottom: -18px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        #crosshair .ch-left {
+            width: 12px;
+            height: 2px;
+            left: -18px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+
+        #crosshair .ch-right {
+            width: 12px;
+            height: 2px;
+            right: -18px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+
+        /* HUD */
+        #hud {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 90;
+            display: none;
+        }
+
+        #hud-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            padding: 20px 30px;
+        }
+
+        .score-panel {
+            background: rgba(0, 0, 0, 0.6);
+            border: 1px solid rgba(138, 43, 226, 0.5);
+            border-radius: 12px;
+            padding: 12px 20px;
+            backdrop-filter: blur(10px);
+            min-width: 160px;
+        }
+
+        .score-panel.self {
+            border-color: rgba(0, 200, 255, 0.6);
+        }
+
+        .score-panel .player-name {
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.6);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 4px;
+        }
+
+        .score-panel .score-value {
+            font-size: 32px;
+            font-weight: 700;
+        }
+
+        .score-panel.self .score-value {
+            color: #00c8ff;
+        }
+
+        .score-panel.enemy .score-value {
+            color: #ff4466;
+        }
+
+        #match-info {
+            text-align: center;
+        }
+
+        #match-info .vs-text {
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.4);
+            letter-spacing: 3px;
+        }
+
+        #match-info .win-target {
+            font-size: 11px;
+            color: rgba(138, 43, 226, 0.8);
+            margin-top: 4px;
+        }
+
+        /* Bottom HUD */
+        #hud-bottom {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            gap: 30px;
+        }
+
+        #ammo-display {
+            background: rgba(0, 0, 0, 0.6);
+            border: 1px solid rgba(138, 43, 226, 0.4);
+            border-radius: 10px;
+            padding: 10px 20px;
+            text-align: center;
+            backdrop-filter: blur(10px);
+        }
+
+        #ammo-display .ammo-label {
+            font-size: 10px;
+            color: rgba(255, 255, 255, 0.5);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        #ammo-display .ammo-value {
+            font-size: 28px;
+            font-weight: 700;
+            color: #00ff88;
+        }
+
+        #ammo-display .ammo-value.empty {
+            color: #ff4466;
+        }
+
+        #ammo-display .ammo-value.reloading {
+            color: #ffaa00;
+            animation: pulse 0.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        #gravity-indicator {
+            background: rgba(0, 0, 0, 0.6);
+            border: 1px solid rgba(138, 43, 226, 0.4);
+            border-radius: 10px;
+            padding: 10px 20px;
+            text-align: center;
+            backdrop-filter: blur(10px);
+        }
+
+        #gravity-indicator .grav-label {
+            font-size: 10px;
+            color: rgba(255, 255, 255, 0.5);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        #gravity-indicator .grav-icon {
+            font-size: 24px;
+            margin-top: 2px;
+            transition: transform 0.3s;
+        }
+
+        #gravity-indicator .grav-icon.flipped {
+            transform: rotate(180deg);
+            color: #ff66aa;
+        }
+
+        /* Gravity flip screen effect */
+        #gravity-flash {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(138, 43, 226, 0.3);
+            pointer-events: none;
+            z-index: 95;
+            opacity: 0;
+            transition: opacity 0.1s;
+        }
+
+        /* Hit marker */
+        #hit-marker {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 100;
+            pointer-events: none;
+            opacity: 0;
+        }
+
+        #hit-marker .hm-line {
+            position: absolute;
+            background: #ff4444;
+            border-radius: 1px;
+        }
+
+        #hit-marker .hm-1 {
+            width: 2px;
+            height: 14px;
+            transform: rotate(45deg);
+            top: -7px;
+            left: 12px;
+        }
+
+        #hit-marker .hm-2 {
+            width: 2px;
+            height: 14px;
+            transform: rotate(-45deg);
+            top: -7px;
+            left: -2px;
+        }
+
+        #hit-marker .hm-3 {
+            width: 2px;
+            height: 14px;
+            transform: rotate(135deg);
+            top: 5px;
+            left: 12px;
+        }
+
+        #hit-marker .hm-4 {
+            width: 2px;
+            height: 14px;
+            transform: rotate(-135deg);
+            top: 5px;
+            left: -2px;
+        }
+
+        /* Damage vignette */
+        #damage-vignette {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 94;
+            opacity: 0;
+            background: radial-gradient(ellipse at center, transparent 50%, rgba(255, 0, 0, 0.6) 100%);
+        }
+
+        /* Kill feed */
+        #kill-feed {
+            position: fixed;
+            top: 80px;
+            right: 30px;
+            z-index: 91;
+            pointer-events: none;
+        }
+
+        .kill-msg {
+            background: rgba(0, 0, 0, 0.7);
+            border-left: 3px solid #ff4466;
+            padding: 8px 14px;
+            margin-bottom: 6px;
+            font-size: 13px;
+            border-radius: 0 6px 6px 0;
+            animation: killFadeIn 0.3s ease, killFadeOut 0.5s ease 2.5s forwards;
+        }
+
+        @keyframes killFadeIn {
+            from { transform: translateX(50px); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        @keyframes killFadeOut {
+            to { opacity: 0; transform: translateX(50px); }
+        }
+
+        /* Menu Screens */
+        #menu-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 200;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #0a0a1a 0%, #1a0a2e 50%, #0a1a2e 100%);
+        }
+
+        .menu-bg-grid {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image:
+                linear-gradient(rgba(138, 43, 226, 0.1) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(138, 43, 226, 0.1) 1px, transparent 1px);
+            background-size: 50px 50px;
+            animation: gridScroll 20s linear infinite;
+        }
+
+        @keyframes gridScroll {
+            to { background-position: 50px 50px; }
+        }
+
+        .game-title {
+            font-size: 72px;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 8px;
+            background: linear-gradient(135deg, #00c8ff, #8a2be2, #ff44aa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 8px;
+            z-index: 1;
+            text-align: center;
+        }
+
+        .game-subtitle {
+            font-size: 16px;
+            color: rgba(255, 255, 255, 0.4);
+            letter-spacing: 6px;
+            text-transform: uppercase;
+            margin-bottom: 50px;
+            z-index: 1;
+        }
+
+        .menu-input {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(138, 43, 226, 0.4);
+            border-radius: 12px;
+            padding: 14px 24px;
+            color: #fff;
+            font-size: 16px;
+            width: 320px;
+            margin-bottom: 15px;
+            z-index: 1;
+            outline: none;
+            transition: border-color 0.3s;
+            text-align: center;
+        }
+
+        .menu-input:focus {
+            border-color: #00c8ff;
+        }
+
+        .menu-input::placeholder {
+            color: rgba(255, 255, 255, 0.3);
+        }
+
+        .menu-btn {
+            background: linear-gradient(135deg, #8a2be2, #6a1fb2);
+            border: none;
+            border-radius: 12px;
+            padding: 16px 40px;
+            color: #fff;
+            font-size: 18px;
+            font-weight: 700;
+            cursor: pointer;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            z-index: 1;
+            transition: all 0.3s;
+            margin: 8px;
+            min-width: 260px;
+            pointer-events: all;
+        }
+
+        .menu-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px rgba(138, 43, 226, 0.4);
+        }
+
+        .menu-btn.secondary {
+            background: linear-gradient(135deg, #1a3a5c, #0a2a4c);
+            border: 1px solid rgba(0, 200, 255, 0.3);
+        }
+
+        .menu-btn.secondary:hover {
+            box-shadow: 0 8px 30px rgba(0, 200, 255, 0.2);
+        }
+
+        #status-text {
+            margin-top: 20px;
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.6);
+            z-index: 1;
+            min-height: 24px;
+            text-align: center;
+        }
+
+        .lobby-code-display {
+            font-size: 36px;
+            font-weight: 900;
+            letter-spacing: 12px;
+            color: #00c8ff;
+            background: rgba(0, 200, 255, 0.1);
+            border: 1px solid rgba(0, 200, 255, 0.3);
+            border-radius: 12px;
+            padding: 14px 30px;
+            margin: 15px 0;
+            z-index: 1;
+        }
+
+        /* Waiting Screen */
+        #waiting-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 200;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #0a0a1a 0%, #1a0a2e 50%, #0a1a2e 100%);
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 3px solid rgba(138, 43, 226, 0.2);
+            border-top-color: #8a2be2;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Win/Lose Screen */
+        #result-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 300;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(10px);
+        }
+
+        #result-text {
+            font-size: 64px;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 8px;
+            margin-bottom: 20px;
+        }
+
+        #result-text.win {
+            color: #00ff88;
+            text-shadow: 0 0 40px rgba(0, 255, 136, 0.5);
+        }
+
+        #result-text.lose {
+            color: #ff4466;
+            text-shadow: 0 0 40px rgba(255, 68, 102, 0.5);
+        }
+
+        #result-scores {
+            font-size: 24px;
+            color: rgba(255, 255, 255, 0.6);
+            margin-bottom: 40px;
+        }
+
+        /* Instructions overlay */
+        #instructions {
+            position: fixed;
+            bottom: 80px;
+            left: 30px;
+            z-index: 91;
+            pointer-events: none;
+            display: none;
+        }
+
+        .instr-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 6px;
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.35);
+        }
+
+        .instr-key {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 4px;
+            padding: 2px 8px;
+            font-size: 11px;
+            min-width: 28px;
+            text-align: center;
+        }
+
+        /* Connection status */
+        #connection-dot {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 91;
+            display: none;
+            align-items: center;
+            gap: 6px;
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.4);
+        }
+
+        .conn-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #00ff88;
+        }
+
+        .conn-dot.disconnected {
+            background: #ff4466;
+        }
+
+        /* Weapon display */
+        #weapon-display {
+            position: fixed;
+            bottom: 0;
+            right: 0;
+            width: 350px;
+            height: 250px;
+            z-index: 89;
+            pointer-events: none;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Menu -->
+    <div id="menu-screen">
+        <div class="menu-bg-grid"></div>
+        <div class="game-title">GRAVITY</div>
+        <div class="game-subtitle">A R E N A</div>
+        <input type="text" id="player-name" class="menu-input" placeholder="Oyuncu Adınız" maxlength="16" value="">
+        <button class="menu-btn" onclick="createLobby()">🎮 Lobi Oluştur</button>
+        <input type="text" id="lobby-code-input" class="menu-input" placeholder="Lobi Kodu Girin" maxlength="6" style="text-transform: uppercase;">
+        <button class="menu-btn secondary" onclick="joinLobby()">🔗 Lobiye Katıl</button>
+        <div id="status-text"></div>
+    </div>
+
+    <!-- Waiting -->
+    <div id="waiting-screen">
+        <div class="menu-bg-grid"></div>
+        <div class="game-title" style="font-size:48px;">GRAVITY ARENA</div>
+        <div class="spinner"></div>
+        <div style="font-size:16px; color:rgba(255,255,255,0.6); margin-bottom:15px; z-index:1;">Rakip bekleniyor...</div>
+        <div style="font-size:13px; color:rgba(255,255,255,0.4); z-index:1; margin-bottom:10px;">Lobi Kodu:</div>
+        <div class="lobby-code-display" id="waiting-lobby-code">----</div>
+        <div style="font-size:12px; color:rgba(255,255,255,0.3); z-index:1; margin-top:8px;">Bu kodu arkadaşınızla paylaşın</div>
+        <button class="menu-btn secondary" onclick="cancelLobby()" style="margin-top:30px; min-width:180px; font-size:14px;">İptal</button>
+    </div>
+
+    <!-- Game HUD -->
+    <div id="hud">
+        <div id="hud-top">
+            <div class="score-panel self">
+                <div class="player-name" id="self-name">Sen</div>
+                <div class="score-value" id="self-score">0</div>
+            </div>
+            <div id="match-info">
+                <div class="vs-text">V S</div>
+                <div class="win-target">İlk 5'e ulaşan kazanır</div>
+            </div>
+            <div class="score-panel enemy">
+                <div class="player-name" id="enemy-name">Rakip</div>
+                <div class="score-value" id="enemy-score">0</div>
+            </div>
+        </div>
+        <div id="hud-bottom">
+            <div id="gravity-indicator">
+                <div class="grav-label">Yerçekimi</div>
+                <div class="grav-icon" id="grav-icon">⬇️</div>
+            </div>
+            <div id="ammo-display">
+                <div class="ammo-label">Mermi</div>
+                <div class="ammo-value" id="ammo-value">1</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Crosshair -->
+    <div id="crosshair">
+        <div class="ch-dot"></div>
+        <div class="ch-line ch-top"></div>
+        <div class="ch-line ch-bottom"></div>
+        <div class="ch-line ch-left"></div>
+        <div class="ch-line ch-right"></div>
+    </div>
+
+    <!-- Effects -->
+    <div id="gravity-flash"></div>
+    <div id="damage-vignette"></div>
+
+    <!-- Hit Marker -->
+    <div id="hit-marker">
+        <div class="hm-line hm-1"></div>
+        <div class="hm-line hm-2"></div>
+        <div class="hm-line hm-3"></div>
+        <div class="hm-line hm-4"></div>
+    </div>
+
+    <!-- Kill Feed -->
+    <div id="kill-feed"></div>
+
+    <!-- Instructions -->
+    <div id="instructions">
+        <div class="instr-item"><span class="instr-key">W A S D</span> Hareket</div>
+        <div class="instr-item"><span class="instr-key">FARE</span> Bakış</div>
+        <div class="instr-item"><span class="instr-key">SPACE</span> Zıpla</div>
+        <div class="instr-item"><span class="instr-key">E</span> Yerçekimi Değiştir</div>
+        <div class="instr-item"><span class="instr-key">SOL TIK</span> Ateş</div>
+    </div>
+
+    <!-- Connection -->
+    <div id="connection-dot">
+        <div class="conn-dot" id="conn-dot-el"></div>
+        <span id="conn-text">Bağlı</span>
+    </div>
+
+    <!-- Result Screen -->
+    <div id="result-screen">
+        <div id="result-text">ZAFER!</div>
+        <div id="result-scores"></div>
+        <button class="menu-btn" onclick="backToMenu()">Ana Menü</button>
+    </div>
+
+    <!-- Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <!-- Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+    <script>
+    // ============================================================
+    //  FIREBASE CONFIG
+    // ============================================================
+    const firebaseConfig = {
+        apiKey: "AIzaSyDHIFw7LYjMTpRMpe-ONkSm91fdXk4JWY4",
+        authDomain: "gravityarena-14578.firebaseapp.com",
+        databaseURL: "https://gravityarena-14578-default-rtdb.europe-west1.firebasedatabase.app",
+        projectId: "gravityarena-14578",
+        storageBucket: "gravityarena-14578.firebasestorage.app",
+        messagingSenderId: "781898977885",
+        appId: "1:781898977885:web:a047f4ed10ef296bee73b4"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    console.log("[Gravity Arena] Firebase başlatıldı");
+
+    // ============================================================
+    //  GLOBAL STATE
+    // ============================================================
+    let gameState = 'menu'; // menu, waiting, playing, result
+    let lobbyId = null;
+    let playerId = null; // 'player1' or 'player2'
+    let playerName = 'Oyuncu';
+    let enemyName = 'Rakip';
+    let lobbyRef = null;
+    let myScore = 0;
+    let enemyScore = 0;
+    const WIN_SCORE = 5;
+
+    // Three.js
+    let scene, camera, renderer, clock;
+    let arenaGroup;
+
+    // Player Physics
+    const ARENA = { w: 40, h: 16, d: 40 };
+    const PLAYER_HEIGHT = 1.7;
+    const PLAYER_RADIUS = 0.5;
+    const MOVE_SPEED = 12;
+    const JUMP_FORCE = 8;
+    const GRAVITY_STRENGTH = 20;
+    const MOUSE_SENSITIVITY = 0.002;
+
+    let playerPos = new THREE.Vector3(0, 2, 0);
+    let playerVel = new THREE.Vector3(0, 0, 0);
+    let gravityDir = -1; // -1 = normal (down), +1 = reversed (up)
+    let onGround = false;
+    let yaw = 0;
+    let pitch = 0;
+
+    // Input
+    const keys = {};
+    let isPointerLocked = false;
+
+    // Ammo
+    let hasAmmo = true;
+    let isReloading = false;
+    let reloadTimer = null;
+
+    // Bullets
+    let bullets = []; // Local bullets
+    let enemyBullets = []; // From network
+    const BULLET_SPEED = 50;
+    const BULLET_MAX_BOUNCES = 6;
+    const BULLET_MAX_LIFETIME = 5;
+
+    // Enemy
+    let enemyMesh = null;
+    let enemyPos = new THREE.Vector3(0, 2, 10);
+    let enemyRotY = 0;
+    let enemyGravDir = -1;
+    let enemyVisible = false;
+
+    // Neon materials
+    let neonBlueMat, neonPurpleMat, neonPinkMat, neonGreenMat;
+
+    // Firebase sync
+    let lastSyncTime = 0;
+    const SYNC_INTERVAL = 1000 / 30; // 30 Hz
+    let myBulletIdCounter = 0;
+    let processedHits = {};
+
+    // ============================================================
+    //  UTILITY
+    // ============================================================
+    function generateLobbyCode() {
+        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+        let code = '';
+        for (let i = 0; i < 5; i++) code += chars.charAt(Math.floor(Math.random() * chars.length));
+        return code;
+    }
+
+    function setStatus(msg) {
+        document.getElementById('status-text').textContent = msg;
+        console.log('[Gravity Arena] ' + msg);
+    }
+
+    function showScreen(screen) {
+        document.getElementById('menu-screen').style.display = (screen === 'menu') ? 'flex' : 'none';
+        document.getElementById('waiting-screen').style.display = (screen === 'waiting') ? 'flex' : 'none';
+        document.getElementById('hud').style.display = (screen === 'playing') ? 'block' : 'none';
+        document.getElementById('crosshair').style.display = (screen === 'playing') ? 'block' : 'none';
+        document.getElementById('instructions').style.display = (screen === 'playing') ? 'block' : 'none';
+        document.getElementById('connection-dot').style.display = (screen === 'playing') ? 'flex' : 'none';
+        document.getElementById('result-screen').style.display = (screen === 'result') ? 'flex' : 'none';
+    }
+
+    // ============================================================
+    //  LOBBY SYSTEM
+    // ============================================================
+    function createLobby() {
+        playerName = document.getElementById('player-name').value.trim() || 'Oyuncu 1';
+        lobbyId = generateLobbyCode();
+        playerId = 'player1';
+
+        setStatus('Lobi oluşturuluyor...');
+
+        lobbyRef = db.ref('lobbies/' + lobbyId);
+        lobbyRef.set({
+            status: 'waiting',
+            player1: {
+                name: playerName,
+                pos: { x: -8, y: 2, z: 0 },
+                rot: { yaw: 0, pitch: 0 },
+                gravDir: -1,
+                score: 0,
+                bullet: null,
+                hit: null
+            },
+            player2: null,
+            createdAt: firebase.database.ServerValue.TIMESTAMP
+        }).then(() => {
+            console.log('[Gravity Arena] Lobi oluşturuldu: ' + lobbyId);
+            document.getElementById('waiting-lobby-code').textContent = lobbyId;
+            showScreen('waiting');
+            gameState = 'waiting';
+            listenForOpponent();
+        }).catch(err => {
+            setStatus('Hata: ' + err.message);
+        });
+
+        // Disconnect cleanup
+        lobbyRef.onDisconnect().remove();
+    }
+
+    function joinLobby() {
+        playerName = document.getElementById('player-name').value.trim() || 'Oyuncu 2';
+        const code = document.getElementById('lobby-code-input').value.trim().toUpperCase();
+
+        if (!code || code.length < 4) {
+            setStatus('Geçerli bir lobi kodu girin!');
+            return;
+        }
+
+        lobbyId = code;
+        playerId = 'player2';
+        lobbyRef = db.ref('lobbies/' + lobbyId);
+
+        setStatus('Lobiye bağlanılıyor...');
+
+        lobbyRef.once('value').then(snapshot => {
+            const data = snapshot.val();
+            if (!data) {
+                setStatus('Lobi bulunamadı!');
+                return;
+            }
+            if (data.status !== 'waiting') {
+                setStatus('Bu lobi zaten dolu veya oyun başladı!');
+                return;
+            }
+
+            enemyName = data.player1.name || 'Rakip';
+
+            lobbyRef.child('player2').set({
+                name: playerName,
+                pos: { x: 8, y: 2, z: 0 },
+                rot: { yaw: Math.PI, pitch: 0 },
+                gravDir: -1,
+                score: 0,
+                bullet: null,
+                hit: null
+            }).then(() => {
+                lobbyRef.child('status').set('playing');
+                console.log('[Gravity Arena] Lobiye katılındı: ' + lobbyId);
+                startGame();
+            });
+
+            lobbyRef.child('player2').onDisconnect().remove();
+            lobbyRef.child('status').onDisconnect().set('ended');
+        }).catch(err => {
+            setStatus('Hata: ' + err.message);
+        });
+    }
+
+    function listenForOpponent() {
+        lobbyRef.child('status').on('value', snapshot => {
+            if (snapshot.val() === 'playing' && gameState === 'waiting') {
+                lobbyRef.child('player2').once('value').then(snap => {
+                    const p2 = snap.val();
+                    if (p2) {
+                        enemyName = p2.name || 'Rakip';
+                        startGame();
+                    }
+                });
+            }
+        });
+    }
+
+    function cancelLobby() {
+        if (lobbyRef) {
+            lobbyRef.remove();
+            lobbyRef = null;
+        }
+        lobbyId = null;
+        gameState = 'menu';
+        showScreen('menu');
+    }
+
+    function backToMenu() {
+        if (lobbyRef) {
+            lobbyRef.remove();
+            lobbyRef = null;
+        }
+        lobbyId = null;
+        gameState = 'menu';
+        myScore = 0;
+        enemyScore = 0;
+        showScreen('menu');
+
+        // Reset player
+        playerPos.set(0, 2, 0);
+        playerVel.set(0, 0, 0);
+        gravityDir = -1;
+        hasAmmo = true;
+        isReloading = false;
+        bullets = [];
+        enemyBullets = [];
+        enemyVisible = false;
+    }
+
+    // ============================================================
+    //  START GAME
+    // ============================================================
+    function startGame() {
+        gameState = 'playing';
+        showScreen('playing');
+
+        document.getElementById('self-name').textContent = playerName;
+        document.getElementById('enemy-name').textContent = enemyName;
+        document.getElementById('self-score').textContent = '0';
+        document.getElementById('enemy-score').textContent = '0';
+
+        // Set spawn positions
+        if (playerId === 'player1') {
+            playerPos.set(-8, 2, 0);
+            yaw = 0;
+        } else {
+            playerPos.set(8, 2, 0);
+            yaw = Math.PI;
+        }
+        playerVel.set(0, 0, 0);
+        gravityDir = -1;
+        pitch = 0;
+        myScore = 0;
+        enemyScore = 0;
+        hasAmmo = true;
+        isReloading = false;
+        bullets = [];
+        enemyBullets = [];
+        processedHits = {};
+
+        console.log('[Gravity Arena] Oyun başladı! Sen: ' + playerName + ' (' + playerId + ')');
+
+        // Start Firebase listeners
+        setupFirebaseListeners();
+
+        // Request pointer lock
+        renderer.domElement.requestPointerLock();
+    }
+
+    // ============================================================
+    //  FIREBASE SYNC
+    // ============================================================
+    function setupFirebaseListeners() {
+        const enemyId = playerId === 'player1' ? 'player2' : 'player1';
+
+        // Listen for enemy updates
+        lobbyRef.child(enemyId).on('value', snapshot => {
+            const data = snapshot.val();
+            if (!data) {
+                // Enemy disconnected
+                document.getElementById('conn-dot-el').classList.add('disconnected');
+                document.getElementById('conn-text').textContent = 'Rakip ayrıldı';
+                enemyVisible = false;
+                return;
+            }
+
+            document.getElementById('conn-dot-el').classList.remove('disconnected');
+            document.getElementById('conn-text').textContent = 'Bağlı';
+
+            if (data.pos) {
+                enemyPos.set(data.pos.x, data.pos.y, data.pos.z);
+                enemyVisible = true;
+            }
+            if (data.rot) {
+                enemyRotY = data.rot.yaw || 0;
+            }
+            if (data.gravDir !== undefined) {
+                enemyGravDir = data.gravDir;
+            }
+            if (data.score !== undefined) {
+                enemyScore = data.score;
+                document.getElementById('enemy-score').textContent = enemyScore;
+            }
+
+            // Enemy bullet
+            if (data.bullet) {
+                handleEnemyBullet(data.bullet);
+            }
+        });
+
+        // Listen for hit events on me
+        lobbyRef.child(playerId + '/hit').on('value', snapshot => {
+            const hitData = snapshot.val();
+            if (hitData && !processedHits[hitData.id]) {
+                processedHits[hitData.id] = true;
+                onGotHit();
+                // Clear hit
+                lobbyRef.child(playerId + '/hit').remove();
+            }
+        });
+
+        // Listen for game status
+        lobbyRef.child('status').on('value', snapshot => {
+            if (snapshot.val() === 'ended' && gameState === 'playing') {
+                // Game ended externally
+            }
+        });
+    }
+
+    function syncToFirebase() {
+        if (!lobbyRef || gameState !== 'playing') return;
+
+        const now = performance.now();
+        if (now - lastSyncTime < SYNC_INTERVAL) return;
+        lastSyncTime = now;
+
+        const updates = {};
+        updates[playerId + '/pos'] = {
+            x: Math.round(playerPos.x * 100) / 100,
+            y: Math.round(playerPos.y * 100) / 100,
+            z: Math.round(playerPos.z * 100) / 100
+        };
+        updates[playerId + '/rot'] = {
+            yaw: Math.round(yaw * 1000) / 1000,
+            pitch: Math.round(pitch * 1000) / 1000
+        };
+        updates[playerId + '/gravDir'] = gravityDir;
+        updates[playerId + '/score'] = myScore;
+
+        lobbyRef.update(updates);
+    }
+
+    function sendBulletToFirebase(bullet) {
+        if (!lobbyRef) return;
+        myBulletIdCounter++;
+        const bulletData = {
+            id: playerId + '_' + myBulletIdCounter + '_' + Date.now(),
+            pos: {
+                x: Math.round(bullet.position.x * 100) / 100,
+                y: Math.round(bullet.position.y * 100) / 100,
+                z: Math.round(bullet.position.z * 100) / 100
+            },
+            dir: {
+                x: Math.round(bullet.userData.direction.x * 1000) / 1000,
+                y: Math.round(bullet.userData.direction.y * 1000) / 1000,
+                z: Math.round(bullet.userData.direction.z * 1000) / 1000
+            },
+            speed: BULLET_SPEED,
+            time: Date.now()
+        };
+        lobbyRef.child(playerId + '/bullet').set(bulletData);
+    }
+
+    function sendHitToEnemy() {
+        if (!lobbyRef) return;
+        const enemyId = playerId === 'player1' ? 'player2' : 'player1';
+        const hitData = {
+            id: 'hit_' + Date.now() + '_' + Math.random(),
+            by: playerName,
+            time: Date.now()
+        };
+        lobbyRef.child(enemyId + '/hit').set(hitData);
+    }
+
+    let lastEnemyBulletId = null;
+
+    function handleEnemyBullet(bulletData) {
+        if (!bulletData || bulletData.id === lastEnemyBulletId) return;
+        lastEnemyBulletId = bulletData.id;
+
+        // Create enemy bullet locally
+        const pos = new THREE.Vector3(bulletData.pos.x, bulletData.pos.y, bulletData.pos.z);
+        const dir = new THREE.Vector3(bulletData.dir.x, bulletData.dir.y, bulletData.dir.z).normalize();
+
+        spawnEnemyBullet(pos, dir);
+    }
+
+    function onGotHit() {
+        // Show damage effect
+        showDamageEffect();
+        // Respawn
+        respawnPlayer();
+        console.log('[Gravity Arena] Vuruldun!');
+        addKillFeed(enemyName + ' seni vurdu!');
+    }
+
+    function onHitEnemy() {
+        myScore++;
+        document.getElementById('self-score').textContent = myScore;
+        showHitMarker();
+        addKillFeed(playerName + ' rakibi vurdu!');
+        console.log('[Gravity Arena] Rakibi vurdun! Skor: ' + myScore);
+
+        // Send hit to enemy via Firebase
+        sendHitToEnemy();
+
+        // Sync score
+        if (lobbyRef) {
+            lobbyRef.child(playerId + '/score').set(myScore);
+        }
+
+        // Check win
+        if (myScore >= WIN_SCORE) {
+            gameState = 'result';
+            document.getElementById('result-text').textContent = 'ZAFER!';
+            document.getElementById('result-text').className = 'win';
+            document.getElementById('result-scores').textContent = myScore + ' - ' + enemyScore;
+            showScreen('result');
+            document.exitPointerLock();
+
+            if (lobbyRef) {
+                lobbyRef.child('status').set('ended');
+            }
+        }
+    }
+
+    function respawnPlayer() {
+        const spawnPoints = [
+            new THREE.Vector3(-8, 2, -8),
+            new THREE.Vector3(8, 2, 8),
+            new THREE.Vector3(-8, 2, 8),
+            new THREE.Vector3(8, 2, -8),
+            new THREE.Vector3(0, 2, 0)
+        ];
+        const spawn = spawnPoints[Math.floor(Math.random() * spawnPoints.length)];
+        playerPos.copy(spawn);
+        playerVel.set(0, 0, 0);
+        gravityDir = -1;
+        updateGravityUI();
+
+        // Check if enemy won
+        if (enemyScore >= WIN_SCORE) {
+            gameState = 'result';
+            document.getElementById('result-text').textContent = 'YENİLDİN!';
+            document.getElementById('result-text').className = 'lose';
+            document.getElementById('result-scores').textContent = myScore + ' - ' + enemyScore;
+            showScreen('result');
+            document.exitPointerLock();
+        }
+    }
+
+    // ============================================================
+    //  THREE.JS SETUP
+    // ============================================================
+    function initThree() {
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x050510);
+        scene.fog = new THREE.FogExp2(0x050510, 0.015);
+
+        camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 200);
+
+        renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.2;
+        document.body.prepend(renderer.domElement);
+
+        clock = new THREE.Clock();
+
+        // Materials
+        neonBlueMat = new THREE.MeshStandardMaterial({
+            color: 0x00c8ff,
+            emissive: 0x00c8ff,
+            emissiveIntensity: 2,
+            metalness: 0.8,
+            roughness: 0.2
+        });
+
+        neonPurpleMat = new THREE.MeshStandardMaterial({
+            color: 0x8a2be2,
+            emissive: 0x8a2be2,
+            emissiveIntensity: 1.5,
+            metalness: 0.8,
+            roughness: 0.2
+        });
+
+        neonPinkMat = new THREE.MeshStandardMaterial({
+            color: 0xff44aa,
+            emissive: 0xff44aa,
+            emissiveIntensity: 1.5,
+            metalness: 0.8,
+            roughness: 0.2
+        });
+
+        neonGreenMat = new THREE.MeshStandardMaterial({
+            color: 0x00ff88,
+            emissive: 0x00ff88,
+            emissiveIntensity: 2,
+            metalness: 0.8,
+            roughness: 0.2
+        });
+
+        buildArena();
+        buildLights();
+        buildEnemyMesh();
+
+        console.log('[Gravity Arena] Three.js sahne hazır');
+    }
+
+    // ============================================================
+    //  ARENA CONSTRUCTION
+    // ============================================================
+    function buildArena() {
+        arenaGroup = new THREE.Group();
+        scene.add(arenaGroup);
+
+        const hw = ARENA.w / 2;
+        const hh = ARENA.h / 2;
+        const hd = ARENA.d / 2;
+
+        // Floor
+        const floorGeo = new THREE.PlaneGeometry(ARENA.w, ARENA.d);
+        const floorMat = new THREE.MeshStandardMaterial({
+            color: 0x1a1a2e,
+            metalness: 0.6,
+            roughness: 0.4
+        });
+        const floor = new THREE.Mesh(floorGeo, floorMat);
+        floor.rotation.x = -Math.PI / 2;
+        floor.position.y = 0;
+        floor.receiveShadow = true;
+        arenaGroup.add(floor);
+
+        // Floor grid
+        const gridHelper = new THREE.GridHelper(ARENA.w, 20, 0x2a2a4e, 0x1a1a3e);
+        gridHelper.position.y = 0.01;
+        arenaGroup.add(gridHelper);
+
+        // Ceiling
+        const ceilMat = new THREE.MeshStandardMaterial({
+            color: 0x12121f,
+            metalness: 0.7,
+            roughness: 0.3
+        });
+        const ceil = new THREE.Mesh(floorGeo, ceilMat);
+        ceil.rotation.x = Math.PI / 2;
+        ceil.position.y = ARENA.h;
+        ceil.receiveShadow = true;
+        arenaGroup.add(ceil);
+
+        // Ceiling grid
+        const ceilGrid = new THREE.GridHelper(ARENA.w, 20, 0x2a2a4e, 0x1a1a3e);
+        ceilGrid.position.y = ARENA.h - 0.01;
+        arenaGroup.add(ceilGrid);
+
+        // Walls
+        const wallMat = new THREE.MeshStandardMaterial({
+            color: 0x0f0f2a,
+            metalness: 0.5,
+            roughness: 0.5,
+            transparent: true,
+            opacity: 0.85
+        });
+
+        // Wall +Z
+        const wallGeoWD = new THREE.PlaneGeometry(ARENA.w, ARENA.h);
+        const wallGeoDD = new THREE.PlaneGeometry(ARENA.d, ARENA.h);
+
+        const wall1 = new THREE.Mesh(wallGeoWD, wallMat.clone());
+        wall1.position.set(0, hh, hd);
+        wall1.rotation.y = Math.PI;
+        wall1.receiveShadow = true;
+        arenaGroup.add(wall1);
+
+        // Wall -Z
+        const wall2 = new THREE.Mesh(wallGeoWD, wallMat.clone());
+        wall2.position.set(0, hh, -hd);
+        wall2.receiveShadow = true;
+        arenaGroup.add(wall2);
+
+        // Wall +X
+        const wall3 = new THREE.Mesh(wallGeoDD, wallMat.clone());
+        wall3.position.set(hw, hh, 0);
+        wall3.rotation.y = -Math.PI / 2;
+        wall3.receiveShadow = true;
+        arenaGroup.add(wall3);
+
+        // Wall -X
+        const wall4 = new THREE.Mesh(wallGeoDD, wallMat.clone());
+        wall4.position.set(-hw, hh, 0);
+        wall4.rotation.y = Math.PI / 2;
+        wall4.receiveShadow = true;
+        arenaGroup.add(wall4);
+
+        // Neon edge lines
+        buildNeonEdges(hw, hh, hd);
+
+        // Arena obstacles (pillars)
+        buildObstacles();
+    }
+
+    function buildNeonEdges(hw, hh, hd) {
+        const lineMat = new THREE.LineBasicMaterial({ color: 0x8a2be2, linewidth: 2 });
+        const lineMat2 = new THREE.LineBasicMaterial({ color: 0x00c8ff, linewidth: 2 });
+
+        // Bottom edges
+        const bottomEdges = [
+            [[-hw, 0, -hd], [hw, 0, -hd]],
+            [[hw, 0, -hd], [hw, 0, hd]],
+            [[hw, 0, hd], [-hw, 0, hd]],
+            [[-hw, 0, hd], [-hw, 0, -hd]]
+        ];
+
+        // Top edges
+        const topEdges = [
+            [[-hw, ARENA.h, -hd], [hw, ARENA.h, -hd]],
+            [[hw, ARENA.h, -hd], [hw, ARENA.h, hd]],
+            [[hw, ARENA.h, hd], [-hw, ARENA.h, hd]],
+            [[-hw, ARENA.h, hd], [-hw, ARENA.h, -hd]]
+        ];
+
+        // Vertical edges
+        const vertEdges = [
+            [[-hw, 0, -hd], [-hw, ARENA.h, -hd]],
+            [[hw, 0, -hd], [hw, ARENA.h, -hd]],
+            [[hw, 0, hd], [hw, ARENA.h, hd]],
+            [[-hw, 0, hd], [-hw, ARENA.h, hd]]
+        ];
+
+        function addEdgeTube(start, end, material, radius) {
+            const s = new THREE.Vector3(...start);
+            const e = new THREE.Vector3(...end);
+            const path = new THREE.LineCurve3(s, e);
+            const tubeGeo = new THREE.TubeGeometry(path, 1, radius || 0.06, 6, false);
+            const tube = new THREE.Mesh(tubeGeo, material);
+            arenaGroup.add(tube);
+
+            // Add glow point light at midpoint
+            const mid = new THREE.Vector3().addVectors(s, e).multiplyScalar(0.5);
+            const light = new THREE.PointLight(material.color.getHex(), 0.3, 8);
+            light.position.copy(mid);
+            arenaGroup.add(light);
+        }
+
+        bottomEdges.forEach(e => addEdgeTube(e[0], e[1], neonPurpleMat));
+        topEdges.forEach(e => addEdgeTube(e[0], e[1], neonPurpleMat));
+        vertEdges.forEach(e => addEdgeTube(e[0], e[1], neonBlueMat.clone()));
+
+        // Middle horizontal neon lines on walls
+        const midH = ARENA.h / 2;
+        const midLines = [
+            [[-hw, midH, -hd], [hw, midH, -hd]],
+            [[hw, midH, -hd], [hw, midH, hd]],
+            [[hw, midH, hd], [-hw, midH, hd]],
+            [[-hw, midH, hd], [-hw, midH, -hd]]
+        ];
+        const midMat = neonPinkMat.clone();
+        midMat.emissiveIntensity = 0.8;
+        midLines.forEach(e => addEdgeTube(e[0], e[1], midMat, 0.04));
+    }
+
+    function buildObstacles() {
+        const pillarMat = new THREE.MeshStandardMaterial({
+            color: 0x1a1a3e,
+            metalness: 0.7,
+            roughness: 0.3
+        });
+
+        const positions = [
+            { x: -10, z: -10 },
+            { x: 10, z: -10 },
+            { x: -10, z: 10 },
+            { x: 10, z: 10 },
+            { x: 0, z: -12 },
+            { x: 0, z: 12 }
+        ];
+
+        positions.forEach(p => {
+            const pillarGeo = new THREE.BoxGeometry(2, ARENA.h, 2);
+            const pillar = new THREE.Mesh(pillarGeo, pillarMat);
+            pillar.position.set(p.x, ARENA.h / 2, p.z);
+            pillar.castShadow = true;
+            pillar.receiveShadow = true;
+            arenaGroup.add(pillar);
+
+            // Neon strip on pillar
+            const stripGeo = new THREE.BoxGeometry(2.05, 0.1, 2.05);
+            for (let i = 0; i < 4; i++) {
+                const strip = new THREE.Mesh(stripGeo, neonPurpleMat.clone());
+                strip.position.set(p.x, i * (ARENA.h / 3) + ARENA.h / 6, p.z);
+                arenaGroup.add(strip);
+            }
+        });
+
+        // Center platform
+        const platGeo = new THREE.BoxGeometry(6, 1, 6);
+        const platMat = new THREE.MeshStandardMaterial({
+            color: 0x1a1a3e,
+            metalness: 0.7,
+            roughness: 0.3
+        });
+        const platform = new THREE.Mesh(platGeo, platMat);
+        platform.position.set(0, ARENA.h / 2, 0);
+        platform.castShadow = true;
+        platform.receiveShadow = true;
+        arenaGroup.add(platform);
+
+        // Neon edge on platform
+        const platEdgeMat = neonBlueMat.clone();
+        platEdgeMat.emissiveIntensity = 1;
+        const peGeo = new THREE.BoxGeometry(6.1, 0.08, 6.1);
+        const pe1 = new THREE.Mesh(peGeo, platEdgeMat);
+        pe1.position.set(0, ARENA.h / 2 + 0.51, 0);
+        arenaGroup.add(pe1);
+        const pe2 = new THREE.Mesh(peGeo, platEdgeMat);
+        pe2.position.set(0, ARENA.h / 2 - 0.51, 0);
+        arenaGroup.add(pe2);
+    }
+
+    // ============================================================
+    //  LIGHTS
+    // ============================================================
+    function buildLights() {
+        // Ambient
+        const ambient = new THREE.AmbientLight(0x222244, 0.6);
+        scene.add(ambient);
+
+        // Hemisphere
+        const hemi = new THREE.HemisphereLight(0x4444aa, 0x222222, 0.4);
+        scene.add(hemi);
+
+        // Point lights
+        const colors = [0x00c8ff, 0x8a2be2, 0xff44aa, 0x00ff88];
+        const positions = [
+            [0, ARENA.h - 1, 0],
+            [-15, 3, -15],
+            [15, 3, 15],
+            [0, 3, 0]
+        ];
+
+        positions.forEach((p, i) => {
+            const pl = new THREE.PointLight(colors[i], 1.2, 30);
+            pl.position.set(...p);
+            pl.castShadow = true;
+            pl.shadow.mapSize.set(512, 512);
+            scene.add(pl);
+        });
+
+        // Spot light from ceiling center
+        const spot = new THREE.SpotLight(0x8a2be2, 1.5, 40, Math.PI / 4, 0.5);
+        spot.position.set(0, ARENA.h - 0.5, 0);
+        spot.target.position.set(0, 0, 0);
+        spot.castShadow = true;
+        scene.add(spot);
+        scene.add(spot.target);
+    }
+
+    // ============================================================
+    //  ENEMY MESH
+    // ============================================================
+    function buildEnemyMesh() {
+        const enemyGroup = new THREE.Group();
+
+        // Body
+        const bodyGeo = new THREE.CapsuleGeometry(0.4, 1.0, 8, 12);
+        const bodyMat = new THREE.MeshStandardMaterial({
+            color: 0xff4466,
+            emissive: 0xff2244,
+            emissiveIntensity: 0.3,
+            metalness: 0.6,
+            roughness: 0.4
+        });
+        const body = new THREE.Mesh(bodyGeo, bodyMat);
+        body.position.y = 0;
+        body.castShadow = true;
+        enemyGroup.add(body);
+
+        // Head
+        const headGeo = new THREE.SphereGeometry(0.3, 12, 12);
+        const headMat = new THREE.MeshStandardMaterial({
+            color: 0xff6688,
+            emissive: 0xff4466,
+            emissiveIntensity: 0.4,
+            metalness: 0.6,
+            roughness: 0.3
+        });
+        const head = new THREE.Mesh(headGeo, headMat);
+        head.position.y = 0.85;
+        head.castShadow = true;
+        enemyGroup.add(head);
+
+        // Visor
+        const visorGeo = new THREE.BoxGeometry(0.35, 0.12, 0.15);
+        const visorMat = new THREE.MeshStandardMaterial({
+            color: 0x00c8ff,
+            emissive: 0x00c8ff,
+            emissiveIntensity: 2,
+            metalness: 0.9,
+            roughness: 0.1
+        });
+        const visor = new THREE.Mesh(visorGeo, visorMat);
+        visor.position.set(0, 0.88, 0.25);
+        enemyGroup.add(visor);
+
+        // Glow
+        const glowLight = new THREE.PointLight(0xff4466, 0.8, 6);
+        glowLight.position.set(0, 0.5, 0);
+        enemyGroup.add(glowLight);
+
+        enemyMesh = enemyGroup;
+        enemyMesh.visible = false;
+        scene.add(enemyMesh);
+    }
+
+    // ============================================================
+    //  INPUT
+    // ============================================================
+    function initInput() {
+        document.addEventListener('keydown', (e) => {
+            keys[e.code] = true;
+
+            if (e.code === 'KeyE' && gameState === 'playing') {
+                toggleGravity();
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            keys[e.code] = false;
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isPointerLocked || gameState !== 'playing') return;
+
+            yaw -= e.movementX * MOUSE_SENSITIVITY;
+            pitch -= e.movementY * MOUSE_SENSITIVITY;
+            pitch = Math.max(-Math.PI / 2.1, Math.min(Math.PI / 2.1, pitch));
+        });
+
+        document.addEventListener('mousedown', (e) => {
+            if (e.button === 0 && gameState === 'playing' && isPointerLocked) {
+                shoot();
+            }
+        });
+
+        document.addEventListener('pointerlockchange', () => {
+            isPointerLocked = document.pointerLockElement === renderer.domElement;
+            document.body.style.cursor = isPointerLocked ? 'none' : 'default';
+        });
+
+        renderer.domElement.addEventListener('click', () => {
+            if (gameState === 'playing' && !isPointerLocked) {
+                renderer.domElement.requestPointerLock();
+            }
+        });
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    }
+
+    // ============================================================
+    //  GRAVITY TOGGLE
+    // ============================================================
+    function toggleGravity() {
+        gravityDir *= -1;
+        onGround = false;
+
+        // Flash effect
+        const flash = document.getElementById('gravity-flash');
+        flash.style.opacity = '1';
+        setTimeout(() => flash.style.opacity = '0', 150);
+
+        // Camera shake
+        shakeCamera(0.1, 200);
+
+        updateGravityUI();
+        console.log('[Gravity Arena] Yerçekimi değişti: ' + (gravityDir === -1 ? 'Normal' : 'Ters'));
+    }
+
+    function updateGravityUI() {
+        const icon = document.getElementById('grav-icon');
+        if (gravityDir === -1) {
+            icon.textContent = '⬇️';
+            icon.classList.remove('flipped');
+        } else {
+            icon.textContent = '⬆️';
+            icon.classList.add('flipped');
+        }
+    }
+
+    let cameraShake = { intensity: 0, duration: 0, timer: 0 };
+
+    function shakeCamera(intensity, duration) {
+        cameraShake.intensity = intensity;
+        cameraShake.duration = duration / 1000;
+        cameraShake.timer = 0;
+    }
+
+    // ============================================================
+    //  SHOOTING
+    // ============================================================
+    function shoot() {
+        if (!hasAmmo || isReloading) return;
+
+        hasAmmo = false;
+        updateAmmoUI();
+
+        // Direction from camera
+        const dir = new THREE.Vector3(0, 0, -1);
+        dir.applyQuaternion(camera.quaternion);
+        dir.normalize();
+
+        // Spawn position slightly in front
+        const spawnPos = camera.position.clone().add(dir.clone().multiplyScalar(1.0));
+
+        createBullet(spawnPos, dir, true);
+
+        console.log('[Gravity Arena] Ateş!');
+    }
+
+    function createBullet(pos, dir, isLocal) {
+        const bulletGeo = new THREE.SphereGeometry(0.12, 8, 8);
+        const bulletMat = new THREE.MeshStandardMaterial({
+            color: isLocal ? 0x00ff88 : 0xff4466,
+            emissive: isLocal ? 0x00ff88 : 0xff4466,
+            emissiveIntensity: 3,
+            metalness: 0.9,
+            roughness: 0.1
+        });
+
+        const bullet = new THREE.Mesh(bulletGeo, bulletMat);
+        bullet.position.copy(pos);
+
+        // Point light on bullet
+        const bLight = new THREE.PointLight(isLocal ? 0x00ff88 : 0xff4466, 2, 8);
+        bullet.add(bLight);
+
+        // Trail
+        const trailPositions = [];
+        const MAX_TRAIL = 30;
+        for (let i = 0; i < MAX_TRAIL; i++) {
+            trailPositions.push(pos.x, pos.y, pos.z);
+        }
+        const trailGeo = new THREE.BufferGeometry();
+        trailGeo.setAttribute('position', new THREE.Float32BufferAttribute(trailPositions, 3));
+        const trailMat = new THREE.LineBasicMaterial({
+            color: isLocal ? 0x00ff88 : 0xff4466,
+            transparent: true,
+            opacity: 0.6
+        });
+        const trail = new THREE.Line(trailGeo, trailMat);
+        scene.add(trail);
+
+        bullet.userData = {
+            direction: dir.clone(),
+            bounces: 0,
+            lifetime: 0,
+            isLocal: isLocal,
+            trail: trail,
+            trailPositions: [],
+            maxTrail: MAX_TRAIL
+        };
+
+        scene.add(bullet);
+
+        if (isLocal) {
+            bullets.push(bullet);
+            sendBulletToFirebase(bullet);
+        } else {
+            enemyBullets.push(bullet);
+        }
+
+        return bullet;
+    }
+
+    function spawnEnemyBullet(pos, dir) {
+        createBullet(pos, dir, false);
+    }
+
+    function updateAmmoUI() {
+        const el = document.getElementById('ammo-value');
+        if (hasAmmo) {
+            el.textContent = '1';
+            el.className = 'ammo-value';
+        } else if (isReloading) {
+            el.textContent = '...';
+            el.className = 'ammo-value reloading';
+        } else {
+            el.textContent = '0';
+            el.className = 'ammo-value empty';
+        }
+    }
+
+    function startReload() {
+        if (isReloading || hasAmmo) return;
+        isReloading = true;
+        updateAmmoUI();
+
+        reloadTimer = setTimeout(() => {
+            hasAmmo = true;
+            isReloading = false;
+            updateAmmoUI();
+            console.log('[Gravity Arena] Mermi yenilendi');
+        }, 1000);
+    }
+
+    // ============================================================
+    //  COLLISION SYSTEM
+    // ============================================================
+    const PILLAR_POSITIONS = [
+        { x: -10, z: -10, hw: 1, hd: 1 },
+        { x: 10, z: -10, hw: 1, hd: 1 },
+        { x: -10, z: 10, hw: 1, hd: 1 },
+        { x: 10, z: 10, hw: 1, hd: 1 },
+        { x: 0, z: -12, hw: 1, hd: 1 },
+        { x: 0, z: 12, hw: 1, hd: 1 }
+    ];
+
+    // Center platform
+    const PLATFORM = {
+        x: 0, y: ARENA.h / 2, z: 0,
+        hw: 3, hh: 0.5, hd: 3
+    };
+
+    function collidePlayerWithArena() {
+        const hw = ARENA.w / 2 - PLAYER_RADIUS;
+        const hd = ARENA.d / 2 - PLAYER_RADIUS;
+
+        // Arena bounds
+        playerPos.x = Math.max(-hw, Math.min(hw, playerPos.x));
+        playerPos.z = Math.max(-hd, Math.min(hd, playerPos.z));
+
+        // Floor / Ceiling
+        if (gravityDir === -1) {
+            if (playerPos.y < PLAYER_HEIGHT) {
+                playerPos.y = PLAYER_HEIGHT;
+                playerVel.y = 0;
+                onGround = true;
+            } else {
+                onGround = false;
+            }
+            if (playerPos.y > ARENA.h - PLAYER_RADIUS) {
+                playerPos.y = ARENA.h - PLAYER_RADIUS;
+                playerVel.y = 0;
+            }
+        } else {
+            if (playerPos.y > ARENA.h - PLAYER_HEIGHT) {
+                playerPos.y = ARENA.h - PLAYER_HEIGHT;
+                playerVel.y = 0;
+                onGround = true;
+            } else {
+                onGround = false;
+            }
+            if (playerPos.y < PLAYER_RADIUS) {
+                playerPos.y = PLAYER_RADIUS;
+                playerVel.y = 0;
+            }
+        }
+
+        // Pillar collisions
+        PILLAR_POSITIONS.forEach(p => {
+            const dx = playerPos.x - p.x;
+            const dz = playerPos.z - p.z;
+            const overlapX = (p.hw + PLAYER_RADIUS) - Math.abs(dx);
+            const overlapZ = (p.hd + PLAYER_RADIUS) - Math.abs(dz);
+
+            if (overlapX > 0 && overlapZ > 0) {
+                if (overlapX < overlapZ) {
+                    playerPos.x += Math.sign(dx) * overlapX;
+                } else {
+                    playerPos.z += Math.sign(dz) * overlapZ;
+                }
+            }
+        });
+
+        // Platform collision
+        const plat = PLATFORM;
+        if (Math.abs(playerPos.x - plat.x) < plat.hw + PLAYER_RADIUS &&
+            Math.abs(playerPos.z - plat.z) < plat.hd + PLAYER_RADIUS) {
+
+            const dy = playerPos.y - plat.y;
+
+            if (gravityDir === -1) {
+                // Landing on top
+                if (dy > 0 && dy < plat.hh + PLAYER_HEIGHT && playerVel.y <= 0) {
+                    playerPos.y = plat.y + plat.hh + PLAYER_HEIGHT;
+                    playerVel.y = 0;
+                    onGround = true;
+                }
+                // Hitting bottom
+                else if (dy < 0 && Math.abs(dy) < plat.hh + PLAYER_RADIUS && playerVel.y > 0) {
+                    playerPos.y = plat.y - plat.hh - PLAYER_RADIUS;
+                    playerVel.y = 0;
+                }
+                // Side push
+                else if (Math.abs(dy) < plat.hh + PLAYER_HEIGHT) {
+                    const overlapX = (plat.hw + PLAYER_RADIUS) - Math.abs(playerPos.x - plat.x);
+                    const overlapZ = (plat.hd + PLAYER_RADIUS) - Math.abs(playerPos.z - plat.z);
+                    if (overlapX > 0 && overlapZ > 0) {
+                        if (overlapX < overlapZ) {
+                            playerPos.x += Math.sign(playerPos.x - plat.x) * overlapX;
+                        } else {
+                            playerPos.z += Math.sign(playerPos.z - plat.z) * overlapZ;
+                        }
+                    }
+                }
+            } else {
+                // Reversed gravity - landing on bottom
+                if (dy < 0 && Math.abs(dy) < plat.hh + PLAYER_HEIGHT && playerVel.y >= 0) {
+                    playerPos.y = plat.y - plat.hh - PLAYER_HEIGHT;
+                    playerVel.y = 0;
+                    onGround = true;
+                }
+                // Hitting top
+                else if (dy > 0 && dy < plat.hh + PLAYER_RADIUS && playerVel.y < 0) {
+                    playerPos.y = plat.y + plat.hh + PLAYER_RADIUS;
+                    playerVel.y = 0;
+                }
+                else if (Math.abs(dy) < plat.hh + PLAYER_HEIGHT) {
+                    const overlapX = (plat.hw + PLAYER_RADIUS) - Math.abs(playerPos.x - plat.x);
+                    const overlapZ = (plat.hd + PLAYER_RADIUS) - Math.abs(playerPos.z - plat.z);
+                    if (overlapX > 0 && overlapZ > 0) {
+                        if (overlapX < overlapZ) {
+                            playerPos.x += Math.sign(playerPos.x - plat.x) * overlapX;
+                        } else {
+                            playerPos.z += Math.sign(playerPos.z - plat.z) * overlapZ;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    function collideBulletWithArena(bullet) {
+        const pos = bullet.position;
+        const dir = bullet.userData.direction;
+        const hw = ARENA.w / 2;
+        const hd = ARENA.d / 2;
+        let bounced = false;
+
+        // Floor
+        if (pos.y < 0.12) {
+            pos.y = 0.12;
+            dir.y = Math.abs(dir.y);
+            bounced = true;
+        }
+        // Ceiling
+        if (pos.y > ARENA.h - 0.12) {
+            pos.y = ARENA.h - 0.12;
+            dir.y = -Math.abs(dir.y);
+            bounced = true;
+        }
+        // Walls X
+        if (pos.x > hw - 0.12) {
+            pos.x = hw - 0.12;
+            dir.x = -Math.abs(dir.x);
+            bounced = true;
+        }
+        if (pos.x < -hw + 0.12) {
+            pos.x = -hw + 0.12;
+            dir.x = Math.abs(dir.x);
+            bounced = true;
+        }
+        // Walls Z
+        if (pos.z > hd - 0.12) {
+            pos.z = hd - 0.12;
+            dir.z = -Math.abs(dir.z);
+            bounced = true;
+        }
+        if (pos.z < -hd + 0.12) {
+            pos.z = -hd + 0.12;
+            dir.z = Math.abs(dir.z);
+            bounced = true;
+        }
+
+        // Pillar bounce
+        PILLAR_POSITIONS.forEach(p => {
+            const dx = pos.x - p.x;
+            const dz = pos.z - p.z;
+            const overlapX = (p.hw + 0.12) - Math.abs(dx);
+            const overlapZ = (p.hd + 0.12) - Math.abs(dz);
+
+            if (overlapX > 0 && overlapZ > 0 && pos.y > 0 && pos.y < ARENA.h) {
+                if (overlapX < overlapZ) {
+                    dir.x = Math.sign(dx) * Math.abs(dir.x);
+                    pos.x += Math.sign(dx) * overlapX;
+                } else {
+                    dir.z = Math.sign(dz) * Math.abs(dir.z);
+                    pos.z += Math.sign(dz) * overlapZ;
+                }
+                bounced = true;
+            }
+        });
+
+        // Platform bounce
+        const plat = PLATFORM;
+        if (Math.abs(pos.x - plat.x) < plat.hw + 0.12 &&
+            Math.abs(pos.y - plat.y) < plat.hh + 0.12 &&
+            Math.abs(pos.z - plat.z) < plat.hd + 0.12) {
+
+            const dx = pos.x - plat.x;
+            const dy = pos.y - plat.y;
+            const dz = pos.z - plat.z;
+
+            const overlapX = (plat.hw + 0.12) - Math.abs(dx);
+            const overlapY = (plat.hh + 0.12) - Math.abs(dy);
+            const overlapZ = (plat.hd + 0.12) - Math.abs(dz);
+
+            if (overlapY < overlapX && overlapY < overlapZ) {
+                dir.y = Math.sign(dy) * Math.abs(dir.y);
+                pos.y += Math.sign(dy) * overlapY;
+            } else if (overlapX < overlapZ) {
+                dir.x = Math.sign(dx) * Math.abs(dir.x);
+                pos.x += Math.sign(dx) * overlapX;
+            } else {
+                dir.z = Math.sign(dz) * Math.abs(dir.z);
+                pos.z += Math.sign(dz) * overlapZ;
+            }
+            bounced = true;
+        }
+
+        if (bounced) {
+            bullet.userData.bounces++;
+            dir.normalize();
+            createBounceEffect(pos.clone(), bullet.userData.isLocal ? 0x00ff88 : 0xff4466);
+        }
+
+        return bounced;
+    }
+
+    function createBounceEffect(pos, color) {
+        const geo = new THREE.SphereGeometry(0.3, 6, 6);
+        const mat = new THREE.MeshStandardMaterial({
+            color: color,
+            emissive: color,
+            emissiveIntensity: 3,
+            transparent: true,
+            opacity: 0.8
+        });
+        const effect = new THREE.Mesh(geo, mat);
+        effect.position.copy(pos);
+        scene.add(effect);
+
+        const startTime = clock.getElapsedTime();
+        effect.userData.update = function () {
+            const elapsed = clock.getElapsedTime() - startTime;
+            const s = 1 + elapsed * 3;
+            effect.scale.set(s, s, s);
+            mat.opacity = Math.max(0, 0.8 - elapsed * 4);
+            if (elapsed > 0.3) {
+                scene.remove(effect);
+                return true;
+            }
+            return false;
+        };
+
+        // Store for updating
+        if (!window._bounceEffects) window._bounceEffects = [];
+        window._bounceEffects.push(effect);
+    }
+
+    // ============================================================
+    //  BULLET UPDATE
+    // ============================================================
+    function updateBullets(dt) {
+        // Local bullets
+        for (let i = bullets.length - 1; i >= 0; i--) {
+            const b = bullets[i];
+            b.userData.lifetime += dt;
+
+            // Move
+            const moveVec = b.userData.direction.clone().multiplyScalar(BULLET_SPEED * dt);
+            b.position.add(moveVec);
+
+            // Bounce
+            collideBulletWithArena(b);
+
+            // Update trail
+            updateTrail(b);
+
+            // Check hit enemy
+            if (enemyVisible && b.position.distanceTo(enemyPos) < 1.2) {
+                onHitEnemy();
+                removeBullet(b, i, bullets);
+                startReload();
+                continue;
+            }
+
+            // Max bounces or lifetime
+            if (b.userData.bounces > BULLET_MAX_BOUNCES || b.userData.lifetime > BULLET_MAX_LIFETIME) {
+                removeBullet(b, i, bullets);
+                startReload();
+            }
+        }
+
+        // Enemy bullets
+        for (let i = enemyBullets.length - 1; i >= 0; i--) {
+            const b = enemyBullets[i];
+            b.userData.lifetime += dt;
+
+            const moveVec = b.userData.direction.clone().multiplyScalar(BULLET_SPEED * dt);
+            b.position.add(moveVec);
+
+            collideBulletWithArena(b);
+            updateTrail(b);
+
+            // Max bounces or lifetime
+            if (b.userData.bounces > BULLET_MAX_BOUNCES || b.userData.lifetime > BULLET_MAX_LIFETIME) {
+                removeBullet(b, i, enemyBullets);
+            }
+        }
+
+        // Bounce effects
+        if (window._bounceEffects) {
+            for (let i = window._bounceEffects.length - 1; i >= 0; i--) {
+                if (window._bounceEffects[i].userData.update()) {
+                    window._bounceEffects.splice(i, 1);
+                }
+            }
+        }
+    }
+
+    function updateTrail(bullet) {
+        const trail = bullet.userData.trail;
+        if (!trail) return;
+
+        // Add current position
+        bullet.userData.trailPositions.unshift(
+            bullet.position.x,
+            bullet.position.y,
+            bullet.position.z
+        );
+
+        const max = bullet.userData.maxTrail * 3;
+        if (bullet.userData.trailPositions.length > max) {
+            bullet.userData.trailPositions.length = max;
+        }
+
+        const posArray = trail.geometry.attributes.position.array;
+        for (let i = 0; i < posArray.length; i++) {
+            posArray[i] = bullet.userData.trailPositions[i] !== undefined
+                ? bullet.userData.trailPositions[i]
+                : bullet.position.getComponent(i % 3);
+        }
+        trail.geometry.attributes.position.needsUpdate = true;
+    }
+
+    function removeBullet(bullet, index, array) {
+        scene.remove(bullet);
+        if (bullet.userData.trail) {
+            scene.remove(bullet.userData.trail);
+        }
+        array.splice(index, 1);
+    }
+
+    // ============================================================
+    //  PLAYER PHYSICS UPDATE
+    // ============================================================
+    function updatePlayer(dt) {
+        if (gameState !== 'playing') return;
+
+        // Gravity
+        playerVel.y += gravityDir * GRAVITY_STRENGTH * dt;
+
+        // Movement input
+        const forward = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
+        const right = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
+
+        let moveX = 0, moveZ = 0;
+        if (keys['KeyW']) { moveX += forward.x; moveZ += forward.z; }
+        if (keys['KeyS']) { moveX -= forward.x; moveZ -= forward.z; }
+        if (keys['KeyA']) { moveX -= right.x; moveZ -= right.z; }
+        if (keys['KeyD']) { moveX += right.x; moveZ += right.z; }
+
+        const len = Math.sqrt(moveX * moveX + moveZ * moveZ);
+        if (len > 0) {
+            moveX /= len;
+            moveZ /= len;
+        }
+
+        playerVel.x = moveX * MOVE_SPEED;
+        playerVel.z = moveZ * MOVE_SPEED;
+
+        // Jump
+        if (keys['Space'] && onGround) {
+            playerVel.y = -gravityDir * JUMP_FORCE;
+            onGround = false;
+        }
+
+        // Apply velocity
+        playerPos.x += playerVel.x * dt;
+        playerPos.y += playerVel.y * dt;
+        playerPos.z += playerVel.z * dt;
+
+        // Collisions
+        collidePlayerWithArena();
+
+        // Camera
+        camera.position.copy(playerPos);
+
+        // Camera shake
+        if (cameraShake.timer < cameraShake.duration) {
+            cameraShake.timer += dt;
+            const factor = 1 - (cameraShake.timer / cameraShake.duration);
+            camera.position.x += (Math.random() - 0.5) * cameraShake.intensity * factor;
+            camera.position.y += (Math.random() - 0.5) * cameraShake.intensity * factor;
+        }
+
+        // Camera rotation
+        const euler = new THREE.Euler(pitch, yaw, 0, 'YXZ');
+        camera.quaternion.setFromEuler(euler);
+
+        // Sync to Firebase
+        syncToFirebase();
+    }
+
+    // ============================================================
+    //  ENEMY UPDATE
+    // ============================================================
+    function updateEnemy(dt) {
+        if (!enemyMesh || !enemyVisible) {
+            if (enemyMesh) enemyMesh.visible = false;
+            return;
+        }
+
+        enemyMesh.visible = true;
+
+        // Smooth interpolation
+        enemyMesh.position.lerp(enemyPos, 0.15);
+        enemyMesh.rotation.y = enemyRotY;
+
+        // Flip if reversed gravity
+        if (enemyGravDir === 1) {
+            enemyMesh.scale.y = -1;
+        } else {
+            enemyMesh.scale.y = 1;
+        }
+    }
+
+    // ============================================================
+    //  UI EFFECTS
+    // ============================================================
+    function showHitMarker() {
+        const hm = document.getElementById('hit-marker');
+        hm.style.opacity = '1';
+        setTimeout(() => hm.style.opacity = '0', 300);
+    }
+
+    function showDamageEffect() {
+        const dv = document.getElementById('damage-vignette');
+        dv.style.opacity = '1';
+        shakeCamera(0.3, 400);
+        setTimeout(() => dv.style.opacity = '0', 500);
+    }
+
+    function addKillFeed(msg) {
+        const feed = document.getElementById('kill-feed');
+        const div = document.createElement('div');
+        div.className = 'kill-msg';
+        div.textContent = msg;
+        feed.appendChild(div);
+        setTimeout(() => {
+            if (div.parentNode) div.parentNode.removeChild(div);
+        }, 3000);
+    }
+
+    // ============================================================
+    //  WEAPON VIEW (simple gun model)
+    // ============================================================
+    let weaponGroup = null;
+    let weaponBobTimer = 0;
+
+    function buildWeapon() {
+        weaponGroup = new THREE.Group();
+
+        // Gun body
+        const bodyGeo = new THREE.BoxGeometry(0.08, 0.08, 0.4);
+        const bodyMat = new THREE.MeshStandardMaterial({
+            color: 0x333344,
+            metalness: 0.8,
+            roughness: 0.3
+        });
+        const body = new THREE.Mesh(bodyGeo, bodyMat);
+        weaponGroup.add(body);
+
+        // Barrel
+        const barrelGeo = new THREE.CylinderGeometry(0.02, 0.025, 0.25, 8);
+        const barrelMat = new THREE.MeshStandardMaterial({
+            color: 0x444455,
+            metalness: 0.9,
+            roughness: 0.2
+        });
+        const barrel = new THREE.Mesh(barrelGeo, barrelMat);
+        barrel.rotation.x = Math.PI / 2;
+        barrel.position.z = -0.3;
+        weaponGroup.add(barrel);
+
+        // Glow tip
+        const tipGeo = new THREE.SphereGeometry(0.03, 8, 8);
+        const tipMat = new THREE.MeshStandardMaterial({
+            color: 0x00ff88,
+            emissive: 0x00ff88,
+            emissiveIntensity: 2
+        });
+        const tip = new THREE.Mesh(tipGeo, tipMat);
+        tip.position.z = -0.42;
+        weaponGroup.add(tip);
+
+        // Handle
+        const handleGeo = new THREE.BoxGeometry(0.06, 0.15, 0.06);
+        const handle = new THREE.Mesh(handleGeo, bodyMat.clone());
+        handle.position.set(0, -0.1, 0.1);
+        handle.rotation.x = -0.2;
+        weaponGroup.add(handle);
+
+        // Neon strip
+        const stripGeo = new THREE.BoxGeometry(0.005, 0.02, 0.35);
+        const stripMat = new THREE.MeshStandardMaterial({
+            color: 0x8a2be2,
+            emissive: 0x8a2be2,
+            emissiveIntensity: 2
+        });
+        const strip = new THREE.Mesh(stripGeo, stripMat);
+        strip.position.set(0.043, 0, 0);
+        weaponGroup.add(strip);
+        const strip2 = new THREE.Mesh(stripGeo, stripMat.clone());
+        strip2.position.set(-0.043, 0, 0);
+        weaponGroup.add(strip2);
+
+        weaponGroup.position.set(0.25, -0.2, -0.4);
+        camera.add(weaponGroup);
+        scene.add(camera);
+    }
+
+    function updateWeapon(dt) {
+        if (!weaponGroup) return;
+
+        // Bobbing
+        const isMoving = keys['KeyW'] || keys['KeyS'] || keys['KeyA'] || keys['KeyD'];
+        if (isMoving && onGround) {
+            weaponBobTimer += dt * 8;
+        } else {
+            weaponBobTimer += dt * 1.5;
+        }
+
+        const bobX = Math.sin(weaponBobTimer) * (isMoving ? 0.01 : 0.003);
+        const bobY = Math.sin(weaponBobTimer * 2) * (isMoving ? 0.008 : 0.002);
+
+        weaponGroup.position.x = 0.25 + bobX;
+        weaponGroup.position.y = -0.2 + bobY;
+
+        // Ammo indicator glow
+        const tip = weaponGroup.children[2]; // glow tip
+        if (tip && tip.material) {
+            if (hasAmmo) {
+                tip.material.emissiveIntensity = 2 + Math.sin(clock.getElapsedTime() * 3) * 0.5;
+                tip.material.color.setHex(0x00ff88);
+                tip.material.emissive.setHex(0x00ff88);
+            } else {
+                tip.material.emissiveIntensity = 0.5;
+                tip.material.color.setHex(0xff4444);
+                tip.material.emissive.setHex(0xff4444);
+            }
+        }
+    }
+
+    // ============================================================
+    //  AMBIENT PARTICLES
+    // ============================================================
+    let particles;
+
+    function buildParticles() {
+        const count = 200;
+        const geo = new THREE.BufferGeometry();
+        const positions = new Float32Array(count * 3);
+        const colors = new Float32Array(count * 3);
+
+        for (let i = 0; i < count; i++) {
+            positions[i * 3] = (Math.random() - 0.5) * ARENA.w;
+            positions[i * 3 + 1] = Math.random() * ARENA.h;
+            positions[i * 3 + 2] = (Math.random() - 0.5) * ARENA.d;
+
+            const color = new THREE.Color();
+            color.setHSL(0.7 + Math.random() * 0.2, 0.8, 0.6);
+            colors[i * 3] = color.r;
+            colors[i * 3 + 1] = color.g;
+            colors[i * 3 + 2] = color.b;
+        }
+
+        geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+        const mat = new THREE.PointsMaterial({
+            size: 0.08,
+            vertexColors: true,
+            transparent: true,
+            opacity: 0.5,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false
+        });
+
+        particles = new THREE.Points(geo, mat);
+        scene.add(particles);
+    }
+
+    function updateParticles(dt) {
+        if (!particles) return;
+        const pos = particles.geometry.attributes.position.array;
+        for (let i = 0; i < pos.length; i += 3) {
+            pos[i + 1] += Math.sin(clock.getElapsedTime() + i) * 0.003;
+            if (pos[i + 1] > ARENA.h) pos[i + 1] = 0;
+            if (pos[i + 1] < 0) pos[i + 1] = ARENA.h;
+        }
+        particles.geometry.attributes.position.needsUpdate = true;
+    }
+
+    // ============================================================
+    //  MAIN GAME LOOP
+    // ============================================================
+    function gameLoop() {
+        requestAnimationFrame(gameLoop);
+
+        const dt = Math.min(clock.getDelta(), 0.05);
+
+        if (gameState === 'playing') {
+            updatePlayer(dt);
+            updateEnemy(dt);
+            updateBullets(dt);
+            updateWeapon(dt);
+            updateParticles(dt);
+        }
+
+        renderer.render(scene, camera);
+    }
+
+    // ============================================================
+    //  INIT
+    // ============================================================
+    function init() {
+        console.log('[Gravity Arena] Oyun başlatılıyor...');
+
+        initThree();
+        buildWeapon();
+        buildParticles();
+        initInput();
+
+        showScreen('menu');
+        gameLoop();
+
+        console.log('[Gravity Arena] Hazır!');
+    }
+
+    // Start when page loaded
+    window.addEventListener('load', init);
+    </script>
+</body>
+</html>
